@@ -25,6 +25,26 @@ namespace RecipeBrowser
 		private int textBlinkerCount;
 		private int textBlinkerState;
 
+		/// <summary>
+		/// Number of characters at the start of <see cref="currentString"/> considered valid.
+		/// </summary>
+		public int ValidLength { get; private set; }
+
+		/// <summary>
+		/// If true, characters beyond <see cref="ValidLength"/> are rendered using <see cref="HighlightColor"/>.
+		/// </summary>
+		public bool HighlightInvalid { get; set; }
+
+		/// <summary>
+		/// Color used to render invalid suffix when <see cref="HighlightInvalid"/> is true.
+		/// </summary>
+		public Color HighlightColor { get; set; } = Color.Red;
+
+		/// <summary>
+		/// Delegate to compute <see cref="ValidLength"/> from <see cref="currentString"/>.
+		/// </summary>
+		public Func<string, int> ValidLengthResolver { get; set; }
+
 		public event Action OnFocus;
 
 		public event Action OnUnfocus;
@@ -206,6 +226,22 @@ namespace RecipeBrowser
 			return Main.inputText.IsKeyDown(key) && !Main.oldInputText.IsKeyDown(key);
 		}
 
+		/// <summary>
+		/// Recomputes <see cref="ValidLength"/> using <see cref="ValidLengthResolver"/>
+		/// if <see cref="HighlightInvalid"/> is enabled; otherwise treats the entire string as valid.
+		/// </summary>
+		private void RecomputeValidLength()
+		{
+			if (ValidLengthResolver != null && HighlightInvalid)
+			{
+				ValidLength = ValidLengthResolver(currentString);
+			}
+			else
+			{
+				ValidLength = currentString.Length;
+			}
+		}
+
 		protected override void DrawSelf(SpriteBatch spriteBatch)
 		{
 			Rectangle hitbox = GetInnerDimensions().ToRectangle();
@@ -222,6 +258,7 @@ namespace RecipeBrowser
 				if (!newString.Equals(currentString))
 				{
 					currentString = newString;
+					RecomputeValidLength();
 					OnTextChanged?.Invoke();
 				}
 				else
@@ -261,13 +298,45 @@ namespace RecipeBrowser
 			if (currentString.Length == 0 && !focused)
 			{
 				color *= 0.5f;
-				//Utils.DrawBorderString(spriteBatch, hintText, new Vector2(space.X, space.Y), Color.Gray, 1f);
 				spriteBatch.DrawString(FontAssets.MouseText.Value, hintText, drawPos, color);
 			}
 			else
 			{
 				//Utils.DrawBorderString(spriteBatch, displayString, drawPos, Color.White, 1f);
-				spriteBatch.DrawString(FontAssets.MouseText.Value, displayString, drawPos, color);
+				// spriteBatch.DrawString(FontAssets.MouseText.Value, displayString, drawPos, color);
+				
+				if (!HighlightInvalid || ValidLength >= currentString.Length)
+					ValidLength = currentString.Length;
+				
+				string valid = currentString[..ValidLength];
+				string invalid = HighlightInvalid
+					? currentString[ValidLength..]
+					: "";
+				
+				float validWidth = FontAssets.MouseText.Value.MeasureString(valid).X;
+				float invalidWidth = FontAssets.MouseText.Value.MeasureString(invalid).X;
+				
+				spriteBatch.DrawString(FontAssets.MouseText.Value, valid, drawPos, color);
+				
+				if (invalid.Length > 0)
+				{
+					spriteBatch.DrawString(
+						FontAssets.MouseText.Value,
+						invalid,
+						drawPos + new Vector2(validWidth, 0),
+						HighlightColor
+					);
+				}
+				
+				if (focused && textBlinkerState == 1)
+				{
+					spriteBatch.DrawString(
+						FontAssets.MouseText.Value,
+						"|",
+						drawPos + new Vector2(validWidth + invalidWidth, 0),
+						color
+					);
+				}
 			}
 
 			//			CalculatedStyle innerDimensions2 = base.GetInnerDimensions();

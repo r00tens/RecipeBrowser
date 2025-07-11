@@ -138,8 +138,10 @@ namespace RecipeBrowser
 			}
 
 			itemNameFilter = new NewUITextBox(RBText("FilterByName", "Common"));
-			itemNameFilter.OnTextChanged += () => { ValidateItemFilter(); updateNeeded = true; };
+			itemNameFilter.OnTextChanged += () => { updateNeeded = true; };
 			itemNameFilter.OnTabPressed += () => { itemDescriptionFilter.Focus(); };
+			itemNameFilter.HighlightInvalid = true;
+			itemNameFilter.ValidLengthResolver = input => CalculateMaxValidLength(input,recipe => recipe.createItem.Name);
 			itemNameFilter.Top.Pixels = 0f;
 			itemNameFilter.Left.Set(-202, 1f);
 			itemNameFilter.Width.Set(150, 0f);
@@ -147,8 +149,10 @@ namespace RecipeBrowser
 			mainPanel.Append(itemNameFilter);
 
 			itemDescriptionFilter = new NewUITextBox(RBText("FilterByTooltip", "Common"));
-			itemDescriptionFilter.OnTextChanged += () => { ValidateItemDescription(); updateNeeded = true; };
+			itemDescriptionFilter.OnTextChanged += () => { updateNeeded = true; };
 			itemDescriptionFilter.OnTabPressed += () => { itemNameFilter.Focus(); };
+			itemDescriptionFilter.HighlightInvalid = true;
+			itemDescriptionFilter.ValidLengthResolver = input => CalculateMaxValidLength(input, recipe => GetTooltipsAsString(recipe.createItem.ToolTip));
 			itemDescriptionFilter.Top.Pixels = 30f;
 			itemDescriptionFilter.Left.Set(-202, 1f);
 			itemDescriptionFilter.Width.Set(150, 0f);
@@ -900,6 +904,37 @@ namespace RecipeBrowser
 				}
 			}
 			updateNeeded = true;
+		}
+
+		/// <summary>
+		/// Returns the length of the longest prefix of <paramref name="input"/>
+		/// that appears (case-insensitive) in any of the texts provided by <paramref name="textSelector"/> over all recipes.
+		/// </summary>
+		/// <param name="input">User-entered filter string.</param>
+		/// <param name="textSelector">Function extracting the searchable text from a Recipe.</param>
+		/// <returns>Number of valid initial characters.</returns>
+		private int CalculateMaxValidLength(string input, Func<Recipe, string> textSelector)
+		{
+			if (string.IsNullOrEmpty(input))
+				return 0;
+			
+			int maxValid = 0;
+			for (int len = 1; len <= input.Length; len++)
+			{
+				string sub = input[..len];
+				if (Enumerable.Range(0, Recipe.numRecipes)
+				    .Any(i => textSelector(Main.recipe[i]).Contains(sub, StringComparison.OrdinalIgnoreCase)))
+				{
+					maxValid = len;
+				}
+				else
+				{
+					break;
+				}
+			}
+			
+			updateNeeded = true;
+			return maxValid;
 		}
 
 		private void ValidateItemDescription()

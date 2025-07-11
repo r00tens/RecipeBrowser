@@ -125,7 +125,9 @@ namespace RecipeBrowser
 			IDSortRadioButton.OnSelectedChanged += (a, b) => updateNeeded = true;
 
 			npcNameFilter = new NewUITextBox(RBText("FilterByName", "Common"));
-			npcNameFilter.OnTextChanged += () => { ValidateNPCFilter(); updateNeeded = true; };
+			npcNameFilter.OnTextChanged += () => { updateNeeded = true; };
+			npcNameFilter.HighlightInvalid = true;
+			npcNameFilter.ValidLengthResolver = (input) => CalculateMaxValidLength(input, Lang.GetNPCNameValue);
 			npcNameFilter.Top.Set(0, 0f);
 			npcNameFilter.Left.Set(-150, 1f);
 			npcNameFilter.Width.Set(150, 0f);
@@ -211,6 +213,49 @@ namespace RecipeBrowser
 			}
 
 			return x.CompareTo(y);
+		}
+
+		/// <summary>
+		/// Returns the length of the longest prefix of <paramref name="input"/>
+		/// that appears (case-insensitive) in any NPC name.
+		/// </summary>
+		/// <param name="input">User-entered filter string.</param>
+		/// <param name="textSelector">
+		/// Function extracting the searchable text (NPC name) from an NPC type.
+		/// </param>
+		/// <returns>Number of valid initial characters.</returns>
+		private int CalculateMaxValidLength(string input, Func<int, string> textSelector)
+		{
+			if (string.IsNullOrEmpty(input))
+				return 0;
+
+			int maxValid = 0;
+			for (int len = 1; len <= input.Length; len++)
+			{
+				string sub = input[..len];
+				bool found = false;
+
+				for (int type = NPCID.NegativeIDCount + 1; type < NPCLoader.NPCCount; type++)
+				{
+					if (type == 0)
+						continue;
+
+					string name = textSelector(type);
+					if (name.Contains(sub, StringComparison.OrdinalIgnoreCase))
+					{
+						found = true;
+						break;
+					}
+				}
+
+				if (found)
+					maxValid = len;
+				else
+					break;
+			}
+
+			updateNeeded = true;
+			return maxValid;
 		}
 
 		private void ValidateNPCFilter()
