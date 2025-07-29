@@ -3,6 +3,8 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using ReLogic.Graphics;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using ReLogic.Content;
 using Terraria;
 using Terraria.GameContent;
@@ -224,6 +226,44 @@ namespace RecipeBrowser
 		private static bool JustPressed(Keys key)
 		{
 			return Main.inputText.IsKeyDown(key) && !Main.oldInputText.IsKeyDown(key);
+		}
+
+		/// <summary>
+		/// Calculates the length of the longest prefix of <paramref name="input"/>
+		/// that appears in any string returned by <paramref name="textSelector"/>
+		/// for items in <paramref name="sourceCollection"/>, ignoring case.
+		/// This implementation avoids multiple enumeration by materializing the collection once.
+		/// </summary>
+		internal int CalculateMaxValidLength<T>(
+			string input,
+			Func<T, string> textSelector,
+			IEnumerable<T> sourceCollection
+		)
+		{
+			if (string.IsNullOrEmpty(input))
+			{
+				return 0;
+			}
+
+			var items = sourceCollection as IList<T> ?? sourceCollection.ToList();
+			int maxValid = 0;
+			
+			for (int len = 1; len <= input.Length; len++)
+			{
+				string prefix = input[..len];
+				bool found = items.Any(item => textSelector(item).Contains(prefix, StringComparison.OrdinalIgnoreCase));
+
+				if (found)
+				{
+					maxValid = len;
+				}
+				else
+				{
+					break;
+				}
+			}
+
+			return maxValid;
 		}
 
 		/// <summary>
